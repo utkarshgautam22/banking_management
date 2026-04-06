@@ -120,4 +120,4 @@ cd backend && npm start
 ---
 
 ## 📜 License
-This project is for demonstration and prototype purposes. Built with ❤️ for Advanced Agentic Coding.
+This project is for demonstration and prototype purposes. Built with ❤️
