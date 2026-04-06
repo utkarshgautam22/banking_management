@@ -40,6 +40,7 @@ CREATE TABLE customer (
   date_of_birth DATE,
   password_hash VARCHAR(255) NOT NULL,
   kyc_status    VARCHAR(20) DEFAULT 'Pending' CHECK (kyc_status IN ('Pending','Verified','Rejected')),
+  session_version INTEGER NOT NULL DEFAULT 1,
   is_active     BOOLEAN DEFAULT TRUE,
   created_at    TIMESTAMP DEFAULT NOW(),
   updated_at    TIMESTAMP DEFAULT NOW()
@@ -53,8 +54,10 @@ CREATE TABLE admin_user (
   name          VARCHAR(100) NOT NULL,
   email         VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  session_version INTEGER NOT NULL DEFAULT 1,
   is_active     BOOLEAN DEFAULT TRUE,
-  created_at    TIMESTAMP DEFAULT NOW()
+  created_at    TIMESTAMP DEFAULT NOW(),
+  updated_at    TIMESTAMP DEFAULT NOW()
 );
 
 -- ========================
@@ -67,10 +70,12 @@ CREATE TABLE employee (
   email         VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role          VARCHAR(30) DEFAULT 'Teller' CHECK (role IN ('Teller','Manager','Analyst')),
+  session_version INTEGER NOT NULL DEFAULT 1,
   phone         VARCHAR(20),
   hire_date     DATE DEFAULT CURRENT_DATE,
   is_active     BOOLEAN DEFAULT TRUE,
-  created_at    TIMESTAMP DEFAULT NOW()
+  created_at    TIMESTAMP DEFAULT NOW(),
+  updated_at    TIMESTAMP DEFAULT NOW()
 );
 
 -- ========================

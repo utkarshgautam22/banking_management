@@ -5,6 +5,16 @@ const jwt = require('jsonwebtoken');
 const generateToken = (payload) =>
   jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 
+const getUserLookupMeta = (role) => {
+  if (role === 'Customer') {
+    return { table: 'customer', idColumn: 'customer_id' };
+  }
+  if (role === 'Employee') {
+    return { table: 'employee', idColumn: 'employee_id' };
+  }
+  return { table: 'admin_user', idColumn: 'admin_id' };
+};
+
 // ─────────────────────────────────────────────────────────────────────
 // POST /api/auth/login
 // Body: { email, password, role }  role: Customer | Employee | Admin
@@ -18,7 +28,9 @@ const login = async (req, res, next) => {
 
     if (role === 'Customer') {
       const result = await pool.query(
-        `SELECT customer_id AS id, first_name || ' ' || last_name AS name, email, password_hash, is_active, kyc_status
+        `SELECT customer_id AS id, first_name, last_name, first_name || ' ' || last_name AS name,
+                email, phone, address, date_of_birth, created_at,
+                password_hash, is_active, kyc_status, session_version
          FROM customer WHERE email = $1`,
         [email]
       );
@@ -26,7 +38,7 @@ const login = async (req, res, next) => {
       if (user) userId = user.id;
     } else if (role === 'Employee') {
       const result = await pool.query(
-        `SELECT employee_id AS id, name, email, password_hash, role AS sub_role, is_active, branch_id
+        `SELECT employee_id AS id, name, email, password_hash, role AS sub_role, is_active, branch_id, session_version
          FROM employee WHERE email = $1`,
         [email]
       );
@@ -34,7 +46,7 @@ const login = async (req, res, next) => {
       if (user) userId = user.id;
     } else if (role === 'Admin') {
       const result = await pool.query(
-        `SELECT admin_id AS id, name, email, password_hash, is_active
+        `SELECT admin_id AS id, name, email, password_hash, is_active, session_version
          FROM admin_user WHERE email = $1`,
         [email]
       );
@@ -62,9 +74,16 @@ const login = async (req, res, next) => {
       email: user.email,
       role,
       name: user.name,
+      session_version: (user.session_version || 1) + 1,
       ...(role === 'Employee' && { sub_role: user.sub_role, branch_id: user.branch_id }),
       ...(role === 'Customer' && { kyc_status: user.kyc_status }),
     };
+
+    const { table, idColumn } = getUserLookupMeta(role);
+    await pool.query(
+      `UPDATE ${table} SET session_version = session_version + 1, updated_at = NOW() WHERE ${idColumn} = $1`,
+      [userId]
+    );
 
     const token = generateToken(tokenPayload);
 
@@ -77,6 +96,14 @@ const login = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role,
+        ...(role === 'Customer' && {
+          first_name: user.first_name,
+          last_name: user.last_name,
+          phone: user.phone,
+          address: user.address,
+          date_of_birth: user.date_of_birth,
+          created_at: user.created_at,
+        }),
         ...(role === 'Employee' && { sub_role: user.sub_role }),
         ...(role === 'Customer' && { kyc_status: user.kyc_status }),
       }
@@ -108,7 +135,7 @@ const register = async (req, res, next) => {
     const custResult = await client.query(
       `INSERT INTO customer (first_name, last_name, email, phone, address, date_of_birth, password_hash, kyc_status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending')
-       RETURNING customer_id, first_name, last_name, email, kyc_status`,
+       RETURNING customer_id, first_name, last_name, email, phone, address, date_of_birth, created_at, kyc_status`,
       [first_name, last_name, email, phone, address, date_of_birth, password_hash]
     );
     const customer = custResult.rows[0];
@@ -135,6 +162,7 @@ const register = async (req, res, next) => {
       email: customer.email,
       role: 'Customer',
       name: `${customer.first_name} ${customer.last_name}`,
+      session_version: 1,
       kyc_status: 'Pending'
     });
 
@@ -145,7 +173,13 @@ const register = async (req, res, next) => {
       user: {
         id: customer.customer_id,
         name: `${customer.first_name} ${customer.last_name}`,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
         email: customer.email,
+        phone: customer.phone,
+        address: customer.address,
+        date_of_birth: customer.date_of_birth,
+        created_at: customer.created_at,
         role: 'Customer',
         kyc_status: 'Pending'
       }
@@ -228,9 +262,9 @@ const changePassword = async (req, res, next) => {
     if (role === 'Customer') {
       await pool.query('UPDATE customer SET password_hash = $1, updated_at = NOW() WHERE customer_id = $2', [newHash, id]);
     } else if (role === 'Employee') {
-      await pool.query('UPDATE employee SET password_hash = $1 WHERE employee_id = $2', [newHash, id]);
+      await pool.query('UPDATE employee SET password_hash = $1, updated_at = NOW() WHERE employee_id = $2', [newHash, id]);
     } else {
-      await pool.query('UPDATE admin_user SET password_hash = $1 WHERE admin_id = $2', [newHash, id]);
+      await pool.query('UPDATE admin_user SET password_hash = $1, updated_at = NOW() WHERE admin_id = $2', [newHash, id]);
     }
 
     res.json({ success: true, message: 'Password changed successfully.' });
@@ -239,4 +273,21 @@ const changePassword = async (req, res, next) => {
   }
 };
 
-module.exports = { login, register, me, changePassword };
+// POST /api/auth/logout
+const logout = async (req, res, next) => {
+  try {
+    const { id, role } = req.user;
+    const { table, idColumn } = getUserLookupMeta(role);
+
+    await pool.query(
+      `UPDATE ${table} SET session_version = session_version + 1, updated_at = NOW() WHERE ${idColumn} = $1`,
+      [id]
+    );
+
+    res.json({ success: true, message: 'Logged out successfully.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { login, register, me, changePassword, logout };

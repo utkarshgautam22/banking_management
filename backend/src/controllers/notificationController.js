@@ -25,7 +25,16 @@ const getNotifications = async (req, res, next) => {
 const markRead = async (req, res, next) => {
   try {
     const { id: notifId } = req.params;
-    await pool.query('UPDATE notification SET is_read = true WHERE notification_id = $1', [notifId]);
+    const { role, id } = req.user;
+    const result = await pool.query(
+      'UPDATE notification SET is_read = true WHERE notification_id = $1 AND user_type = $2 AND user_id = $3 RETURNING notification_id',
+      [notifId, role, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Notification not found.' });
+    }
+
     res.json({ success: true, message: 'Marked as read' });
   } catch (err) {
     next(err);

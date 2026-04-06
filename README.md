@@ -17,7 +17,7 @@ A state-of-the-art, full-stack financial platform built with **Next.js 15**, **N
 - **Real-Time Analysis:** Automated risk assessment on every transaction.
 - **Rule-Based Engine:** Detects large transactions, high-frequency shifts, and velocity anomalies.
 - **RBAC & Path Protection:** Robust Role-Based Access Control enforcing strict isolation between portals with automatic path-based redirection.
-- **Session Isolation:** Per-tab session management allowing multiple accounts to be managed independently.
+- **Session Governance:** Single active browser session with server-side token invalidation for effective session control.
 - **Initial Verification:** Instant background session validation on app mount to prevent unauthorized rendering.
 
 ---
@@ -33,8 +33,21 @@ A state-of-the-art, full-stack financial platform built with **Next.js 15**, **N
 
 ## ⚙️ Preparation & Setup
 
-### 1. Database Configuration
-Ensure **PostgreSQL** is running on your machine.
+### 🚀 **Fast Track (Recommended)**
+If you are on a Linux/macOS system, run the automated setup script from the root directory:
+```bash
+chmod +x setup.sh && ./setup.sh
+```
+This script will:
+- Check system dependencies (Node.js, PostgreSQL).
+- Install all frontend and backend npm packages.
+- Create and configure your local PostgreSQL database (`banking_db`).
+- Seed professional demo data.
+
+---
+
+### Manual Setup
+If you prefer to configure the system manually:
 1. Create a database named `banking_db`.
 2. Run `backend/src/db/schema.sql` to initialize the tables.
 3. (Optional) Run `backend/src/db/seed.js` to populate with professional demo data.

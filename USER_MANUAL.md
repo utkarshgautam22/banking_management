@@ -1,100 +1,95 @@
-# Digital Banking & Fraud Detection System - Comprehensive User Manual 📖
+# Digital Banking and Fraud Detection System - User Manual
 
-Welcome to the Digital Banking platform. This manual provides a step-by-step guide for Customers, Employees, and Administrators to navigate and use the system effectively.
+This manual is the final reference for Customers, Employees, and Administrators using the production-ready banking application.
 
----
+## 1. Login and Session Rules
 
-## 👤 1. Customer Portal: Detailed Guide
+1. Open /login and choose your role: Customer, Employee, or Admin.
+2. Enter valid email and password.
+3. After successful login, you are redirected to your role dashboard automatically.
+4. If you open /login while already authenticated, the app sends you to your dashboard immediately.
 
-As a customer, you can manage your personal finances, apply for loans, and monitor your security.
+Important session behavior:
 
-### 🔑 Getting Started
-1. **Registration:** Visit the [Registration Page](/register) to create your account. 
-   - **Fields Required:** First Name, Last Name, Email, Phone, Address, Date of Birth, and Password.
-   - **Validation:** Passwords must be at least 6 characters.
-2. **Login:** Use your registered email and password on the [Login Page](/login). Ensure "Customer" is selected.
+- Single-user browser session: only one active login is kept in the browser at a time.
+- Cross-tab sync: all tabs share the same signed-in user.
+- Server-side session invalidation: when the same account logs in again, older tokens become invalid.
+- Session expiry: tokens expire after 1 hour and the app returns to login securely.
 
-### 💰 Managing Funds: Interactive Procedures
-- **Dashboard:** 
-  - **Account Balance:** View the total real-time balance for all your accounts.
-  - **Quick Stats:** View your monthly volume and total transaction count.
-- **Transfers:** 
-  - Choose one of your accounts.
-  - Enter valid **Beneficiary Account Number** (e.g., `ACC35467...`).
-  - Choose Transfer Mode:
-    - **NEFT:** Next-business-day settlement.
-    - **IMPS:** Instant, 24/7.
-    - **RTGS:** Minimum ₹2,00,000 required.
-  - Enter Amount (₹).
-  - **Action:** Click "Transfer Now". If successful, your balance will update immediately.
-- **Transactions:** 
-  - Filter and search for specific transaction types (Deposit/Withdrawal/Transfer).
-  - Use the "Download Statement" button for official PDF records (in next release).
+## 2. Password and Account Security
 
-### 🏥 Loans & KYC: Workflow
-- **Apply for Loan:** 
-  - **Selection:** Choose between Personal, Home, Vehicle, or Education.
-  - **Calculation:** Input the amount (₹) and tenure (Months). The interest rate is automatically calculated by the system.
-  - **Submission:** Click "Submit Application". You will get a notification when an employee reviews it.
-- **KYC Status:** Your profile will initially show "Pending KYC". 
-  - Until **Verified**, your transfer limits are capped at ₹1,00,000 per transaction.
-  - Contact support or visit a branch to confirm your identity.
+- Password policy: minimum 8 characters with uppercase, lowercase, number, and special character.
+- Disabled users cannot authenticate.
+- Unauthorized role paths are blocked and redirected to the correct dashboard.
+- Notification read actions are ownership checked, so users can only modify their own notifications.
 
----
+## 3. Customer Portal Guide
 
-## 🧑‍💼 2. Employee Portal: Operations Manual
+Main capabilities:
 
-Employees are responsible for the day-to-day operations and verification of customer data.
+- View account balances and account status.
+- Transfer funds to valid beneficiary accounts.
+- Track transaction history.
+- Apply for loans and pay active loans.
+- Receive account and security notifications.
 
-### 📋 Daily Operations & Navigation
-- **Dashboard Overview:** Monitor total branch deposits and today's active tasks.
-- **Customer Directory:** 
-  - Search for customers by Name, Email, or Account Number.
-  - **Details:** View their full contact information and active account list.
+Transfer process:
 
-### ✅ Verifications: Step-by-Step
-- **KYC Workflow:** 
-  - Access the **KYC Queue** to see all pending identify verifications.
-  - **Verify KYC:** Confirm the customer's ID matches their profile records.
-  - **Reject KYC:** Used if documents are illegible or fraudulent.
-- **Loan Verification:** 
-  - Access the **Loan Queue** to review new applications.
-  - Review the loan amount and purpose.
-  - Click **Approve** to instantly disburse funds to the customer's savings account.
-  - Click **Reject** if the customer's history or details do not meet branch criteria.
+1. Go to Customer -> Transfer.
+2. Select source account.
+3. Enter destination account number.
+4. Enter amount and transfer mode (NEFT, RTGS, UPI, IMPS, Internal).
+5. Submit transfer.
 
----
+System protections during transfer:
 
-## ⚡ 3. Administrator Portal: Technical Oversight
+- Ownership check on source account.
+- Balance check to prevent overdraft.
+- Destination account existence and active status check.
+- Atomic debit/credit update and transfer record creation.
+- Fraud analysis triggered after successful posting.
 
-Administrators have full system-wide control and access to advanced analytics.
+## 4. Employee Portal Guide
 
-### 🛡️ Fraud Monitoring: Security Interactions
-- **Fraud Monitoring Center:** 
-  - **Rules:** The system flags any transaction over ₹50,000 as "High" priority. It flags IMPS transfers over ₹100,000 as "Critical".
-  - **Intervention:** If a transaction looks suspicious, Admin can **Investigate** (flagging to Employee).
-  - **Resolution:** If the customer confirms the activity, Admin clicks **Resolve** to clear the alert.
+Employees can:
 
-### 📈 Reports & Analytics: Interactive Visualizations
-- **System Stats:** Monitor total system AUM (Assets Under Management) and active customer counts.
-- **Analytics Visuals:**
-  - **Monthly Transactions:** Track business growth over a 6-month period.
-  - **Transaction Types:** Understand user behavior (Deposit vs Transfer vs Loan Payment).
-  - **Loan Portfolio:** See which loan categories (e.g., Home) carry the most value.
-  - **Security Overview:** Real-time chart of Fraud Incident severity.
+- Review customers and KYC status.
+- Process pending loan applications.
+- View operational dashboards.
+- Monitor and handle fraud alerts (based on role access).
 
-### 🛠️ System Management
-- **Provisioning:** Create new staff accounts for your bank branches. 
-- **Roles Available:** Teller, Manager, Analyst.
-- **Security Audit:** Deactivate any employee account instantly if security is compromised.
+Loan approval behavior:
 
----
+1. Open pending loan request.
+2. Approve or reject.
+3. On approval, active status is set and disbursement transaction is recorded.
+4. Customer receives a notification.
 
-## 🆘 Troubleshooting
+## 5. Admin Portal Guide
 
-- **"Account Deactivated":** Contact your administrator to re-enable your access.
-- **"Invalid or Expired Token":** For security reasons, sessions expire after 1 hour. Please log in again.
-- **"Access Denied":** RBAC prevents you from accessing a portal not assigned to your role.
+Admins can:
 
----
-**Digital Banking System | Official Documentation 2026**
+- View system-wide reports and analytics.
+- Create employee accounts.
+- Deactivate customer or employee accounts.
+- Update account status (freeze/close workflows).
+- Resolve or dismiss fraud alerts.
+
+## 6. Fraud and Alerting
+
+Alerts are generated automatically for suspicious patterns such as:
+
+- Large-value transactions.
+- Rapid transaction bursts in a short period.
+- High daily outflow behavior.
+
+Alerts are visible in fraud dashboards and linked notifications are generated for relevant users.
+
+## 7. Troubleshooting
+
+- Invalid or expired token: log in again.
+- Session no longer valid: this usually means a newer login replaced the old session.
+- Access denied: verify your selected role and permitted routes.
+- Account deactivated: contact an administrator.
+
+Digital Banking System | Final User Manual 2026

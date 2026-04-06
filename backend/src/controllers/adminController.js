@@ -14,11 +14,11 @@ const getCustomers = async (req, res, next) => {
     const conditions = [];
 
     if (search) {
-      conditions.push(`(c.first_name ILIKE $${params.length+1} OR c.last_name ILIKE $${params.length+1} OR c.email ILIKE $${params.length+1})`);
+      conditions.push(`(c.first_name ILIKE $${params.length + 1} OR c.last_name ILIKE $${params.length + 1} OR c.email ILIKE $${params.length + 1})`);
       params.push(`%${search}%`);
     }
     if (kyc_status) {
-      conditions.push(`c.kyc_status = $${params.length+1}`);
+      conditions.push(`c.kyc_status = $${params.length + 1}`);
       params.push(kyc_status);
     }
     if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
@@ -60,9 +60,22 @@ const updateKyc = async (req, res, next) => {
 const deactivateUser = async (req, res, next) => {
   try {
     const { id, type } = req.params; // type: customer | employee
+    if (!['customer', 'employee'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid user type.' });
+    }
+
     const table = type === 'employee' ? 'employee' : 'customer';
     const idCol = type === 'employee' ? 'employee_id' : 'customer_id';
-    await pool.query(`UPDATE ${table} SET is_active = false WHERE ${idCol} = $1`, [id]);
+
+    const result = await pool.query(
+      `UPDATE ${table} SET is_active = false, updated_at = NOW() WHERE ${idCol} = $1 RETURNING ${idCol}`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: `${type} not found.` });
+    }
+
     res.json({ success: true, message: `${type} deactivated` });
   } catch (err) { next(err); }
 };

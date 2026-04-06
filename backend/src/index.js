@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const errorHandler = require('./middleware/errorHandler');
+const { ensureSchemaCompatibility } = require('./db/migrate');
 
 const app = express();
 
@@ -25,12 +26,12 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Routes ─────────────────────────────────────────────────────────
-app.use('/api/auth',          require('./routes/auth'));
-app.use('/api/accounts',      require('./routes/accounts'));
-app.use('/api/transactions',  require('./routes/transactions'));
-app.use('/api/loans',         require('./routes/loans'));
-app.use('/api/fraud',         require('./routes/fraud'));
-app.use('/api/manage',        require('./routes/admin'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/loans', require('./routes/loans'));
+app.use('/api/fraud', require('./routes/fraud'));
+app.use('/api/manage', require('./routes/admin'));
 app.use('/api/notifications', require('./routes/notifications'));
 
 // ─── 404 ─────────────────────────────────────────────────────────────
@@ -43,9 +44,22 @@ app.use(errorHandler);
 
 // ─── Start ───────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`\n🏦 Digital Banking API running on http://localhost:${PORT}`);
-  console.log(`📋 Health: http://localhost:${PORT}/api/health\n`);
-});
+
+const start = async () => {
+  try {
+    await ensureSchemaCompatibility();
+    console.log('✅ Schema compatibility check completed');
+
+    app.listen(PORT, () => {
+      console.log(`\n🏦 Digital Banking API running on http://localhost:${PORT}`);
+      console.log(`📋 Health: http://localhost:${PORT}/api/health\n`);
+    });
+  } catch (err) {
+    console.error('❌ Failed to start server due to migration error:', err.message);
+    process.exit(1);
+  }
+};
+
+start();
 
 module.exports = app;

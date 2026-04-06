@@ -22,8 +22,10 @@ router.post('/withdraw', auth, [
 
 router.post('/transfer', auth, [
   body('from_account_id').isInt(),
-  body('to_account_number').notEmpty(),
+  body('to_account_number').trim().isLength({ min: 6, max: 20 }),
   body('amount').isFloat({ min: 1 }),
+  body('transfer_mode').optional().isIn(['NEFT', 'RTGS', 'UPI', 'IMPS', 'Internal']),
+  body('description').optional().isLength({ max: 255 }),
   validate
 ], transfer);
 

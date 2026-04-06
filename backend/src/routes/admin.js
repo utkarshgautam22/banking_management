@@ -20,8 +20,14 @@ router.get('/reports', auth, rbac('Admin'), getReports);
 // Customer management
 router.get('/customers', auth, rbac('Admin', 'Employee'), getCustomers);
 router.get('/customers/:id', auth, rbac('Admin', 'Employee'), getCustomer);
-router.patch('/customers/:id/kyc', auth, rbac('Admin', 'Employee'), updateKyc);
-router.patch('/:type/:id/deactivate', auth, rbac('Admin'), deactivateUser);
+router.patch('/customers/:id/kyc', auth, rbac('Admin', 'Employee'), [
+  body('kyc_status').isIn(['Pending', 'Verified', 'Rejected']),
+  validate
+], updateKyc);
+router.patch('/:type/:id/deactivate', auth, rbac('Admin'), [
+  body().custom((_, { req }) => ['customer', 'employee'].includes(req.params.type)),
+  validate
+], deactivateUser);
 
 // Employee management
 router.get('/employees', auth, rbac('Admin'), getEmployees);

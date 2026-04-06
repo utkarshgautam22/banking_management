@@ -1,68 +1,68 @@
-# Digital Banking & Fraud Detection System - Testing Procedure 🧪
+# Digital Banking and Fraud Detection System - Testing Procedure
 
-This document outlines the standard operating procedures for verifying the banking system's functionality, security, and performance.
+This file defines the final regression and security test plan for the application.
 
----
+## 1. Test Environment
 
-## 🏗️ 1. Environmental Setup
+1. Backend running at http://localhost:5000.
+2. Frontend running at http://localhost:3000.
+3. PostgreSQL initialized with schema and seed data.
+4. Fresh browser profile recommended for session tests.
 
-Before testing, ensures:
-- PostgreSQL is running and the `banking_db` is seeded with `src/db/seed.js`.
-- The Backend server is running on `http://localhost:5000`.
-- The Frontend server is running on `http://localhost:3000`.
-
----
-
-## 🔐 2. Authentication & Session Testing
+## 2. Authentication and Session Tests
 
 | Test Case | Procedure | Expected Result |
 | :--- | :--- | :--- |
-| **TC-01: Login Success** | Enter valid credentials for Customer/Employee/Admin. | User is redirected to their specific dashboard with no flicker. |
-| **TC-02: Redirect Logic** | Access `/admin/dashboard` while logged out -> login as Admin. | User is redirected back to `/admin/dashboard` (not default dashboard). |
-| **TC-03: Session Isolation** | Log in as Customer in Tab A and Admin in Tab B. | Tab A remains Customer; Tab B remains Admin (independent sessions). |
-| **TC-04: Token Expiration** | (Simulated) Remove `banking_token` from `sessionStorage` and refresh. | App detects missing token and redirects to `/login?expired=true`. |
-| **TC-05: Unauthorized Access** | Log in as Customer -> manually type `/admin/employees`. | App blocks render and redirects back to `/customer/dashboard`. |
+| TC-01 Login success by role | Login with valid Customer, Employee, and Admin credentials. | Redirect to correct role dashboard each time. |
+| TC-02 Login page auto-redirect | Login, then manually open /login again. | User is immediately redirected to their dashboard. |
+| TC-03 Single browser session | Login as Customer in Tab A, then login as Admin in Tab B in same browser. | Active session is switched; all tabs converge to one active user session. |
+| TC-04 Server-side invalidation | Login with same account in Browser A and Browser B. Use older token in Browser A after Browser B login. | Browser A receives 401 with invalid session and is forced to re-authenticate. |
+| TC-05 Unauthorized route blocking | Login as Customer and open an Admin route directly. | App blocks content and redirects to Customer dashboard. |
+| TC-06 Token expiry behavior | Wait for token expiry or simulate invalid token in storage, then call protected API. | API returns 401 and app redirects to login safely. |
 
----
-
-## 💸 3. Core Banking Functionality Testing
-
-| Test Case | Procedure | Expected Result |
-| :--- | :--- | :--- |
-| **TC-06: Atomic Transfer** | Initiate a transfer of ₹1,000 between two accounts. | Sender balance -₹1,000; Receiver balance +₹1,000; Transaction recorded. |
-| **TC-07: Insufficient Balance** | Attempt a transfer exceeding the current balance. | Backend returns 400 error; transaction fails; data integrity maintained. |
-| **TC-08: Loan Application** | Submit a loan request from Customer dashboard. | Request appears in Employee loan queue with "Pending" status. |
-| **TC-09: Loan Processing** | Employee approves the loan request. | Customer balance increases; status changes to "Active"; notification sent. |
-| **TC-10: KYC Completion** | Employee clicks "Verify KYC" on a pending customer profile. | Customer's status updates instantly; "KYC Pending" badge disappears. |
-
----
-
-## 🛡️ 4. Fraud Detection Testing
+## 3. Banking Transaction Integrity Tests
 
 | Test Case | Procedure | Expected Result |
 | :--- | :--- | :--- |
-| **TC-11: Large Volume Alert** | Transfer ₹150,000 from a new customer account. | Transfer completes but a "Critical" fraud alert is generated in the Admin portal. |
-| **TC-12: Resolution Workflow** | Admin views a "Critical" alert and clicks "Resolve". | Alert status updates to "Resolved"; Auditor name is recorded in history. |
-| **TC-13: Rapid Transactions** | Perform 10 transfers within 60 seconds (Velocity Check). | System flags the account for suspicious activity and creates a security alert. |
+| TC-07 Deposit success | Deposit into owned active account. | Balance increases, transaction logged, notification generated. |
+| TC-08 Withdraw insufficient funds | Attempt withdrawal greater than balance. | Request rejected with 400, no balance mutation. |
+| TC-09 Transfer atomicity | Transfer between two active accounts. | Debit and credit both succeed together with transfer row and transaction rows. |
+| TC-10 Transfer authorization | Customer attempts transfer from account not owned by them. | Request rejected with 403. |
+| TC-11 Transfer validation | Send invalid amount, invalid account number, or invalid transfer mode. | Request rejected with validation error. |
 
----
-
-## 📊 5. UI/UX & Reliability Testing
+## 4. Loan and Operational Tests
 
 | Test Case | Procedure | Expected Result |
 | :--- | :--- | :--- |
-| **TC-14: Responsive Charts** | Resize the browser window on the Admin Dashboard. | Charts (`Recharts`) dynamically resize without `width(-1)` errors. |
-| **TC-15: Error Resilience** | Force a JS crash in a dashboard component (e.g., malformed data). | Global `ErrorBoundary` catches the crash and shows a professional recovery UI. |
-| **TC-16: Theme Integrity** | Navigate across all portals. | Glassmorphic aesthetic is consistent; no broken layouts or missing icons. |
+| TC-12 Loan application | Customer submits valid loan application. | Loan appears as Pending for Employee/Admin review. |
+| TC-13 Loan approval | Employee/Admin approves pending loan. | Loan becomes Active, disbursement transaction recorded, customer notified. |
+| TC-14 Loan repayment | Customer pays from owned account with sufficient balance. | Payment row and repayment transaction created; remaining balance reduced. |
+| TC-15 KYC update validation | Submit invalid kyc_status. | Request rejected by validation middleware. |
 
----
+## 5. Fraud and Notification Security Tests
 
-## 📝 6. Reporting Results
+| Test Case | Procedure | Expected Result |
+| :--- | :--- | :--- |
+| TC-16 High-value fraud detection | Execute high-value transfer above threshold. | Fraud alert created with High or Critical severity. |
+| TC-17 Rapid-activity fraud detection | Execute rapid transaction burst in short window. | Fraud alert created for suspicious velocity. |
+| TC-18 Notification ownership | User attempts to mark another user's notification as read. | API returns not found or denied behavior; target row unchanged. |
 
-Record any failures in the project's issue tracker with:
-- Error Message / Stack Trace
-- Steps to Reproduce
-- User Role at time of failure
+## 6. UI and Build Validation
 
----
-**Digital Banking System | Quality Assurance Team 2026**
+| Test Case | Procedure | Expected Result |
+| :--- | :--- | :--- |
+| TC-19 Frontend production build | Run npm run build in frontend. | Build succeeds with no type errors. |
+| TC-20 Backend startup check | Run npm run start in backend. | API starts and health endpoint returns success. |
+
+## 7. Defect Reporting Template
+
+Record each failure with:
+
+1. Test case ID.
+2. Role and test data used.
+3. Steps to reproduce.
+4. Actual response and expected response.
+5. API payload and status code.
+6. Logs or screenshots.
+
+Digital Banking System | Final QA Procedure 2026

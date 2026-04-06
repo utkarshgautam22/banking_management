@@ -1,6 +1,19 @@
 const pool = require('../db/pool');
 const { runFraudDetection } = require('../services/fraudDetector');
 
+const parsePositiveAmount = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return amount;
+};
+
+const parsePagination = (value, fallback, max) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 0) return fallback;
+  if (typeof max === 'number') return Math.min(parsed, max);
+  return parsed;
+};
+
 // ─────────────────────────────────────────────────────────────────────
 // GET /api/transactions
 // Customer: own txns; Employee/Admin: all or filtered
@@ -8,7 +21,13 @@ const { runFraudDetection } = require('../services/fraudDetector');
 const getTransactions = async (req, res, next) => {
   try {
     const { role, id } = req.user;
-    const { account_id, limit = 20, offset = 0, type } = req.query;
+    const { account_id, type } = req.query;
+    const limit = parsePagination(req.query.limit, 20, 100);
+    const offset = parsePagination(req.query.offset, 0);
+    const accountId = account_id ? Number.parseInt(account_id, 10) : null;
+    const txnType = type && ['Deposit', 'Withdrawal', 'Transfer', 'Loan_Disbursement', 'Loan_Repayment'].includes(type)
+      ? type
+      : null;
 
     let query, params;
 
@@ -18,12 +37,12 @@ const getTransactions = async (req, res, next) => {
         FROM transaction t
         JOIN account a ON t.account_id = a.account_id
         WHERE a.customer_id = $1
-        ${type ? "AND t.transaction_type = $4" : ""}
+        ${txnType ? "AND t.transaction_type = $4" : ""}
         ORDER BY t.transaction_time DESC
         LIMIT $2 OFFSET $3
       `;
-      params = type ? [id, limit, offset, type] : [id, limit, offset];
-    } else if (account_id) {
+      params = txnType ? [id, limit, offset, txnType] : [id, limit, offset];
+    } else if (accountId) {
       query = `
         SELECT t.*, a.account_number, c.first_name || ' ' || c.last_name AS customer_name
         FROM transaction t
@@ -33,7 +52,7 @@ const getTransactions = async (req, res, next) => {
         ORDER BY t.transaction_time DESC
         LIMIT $2 OFFSET $3
       `;
-      params = [account_id, limit, offset];
+      params = [accountId, limit, offset];
     } else {
       query = `
         SELECT t.*, a.account_number, c.first_name || ' ' || c.last_name AS customer_name
@@ -61,6 +80,11 @@ const deposit = async (req, res, next) => {
   try {
     const { account_id, amount, description } = req.body;
     const { id: userId, role } = req.user;
+    const normalizedAmount = parsePositiveAmount(amount);
+
+    if (!normalizedAmount) {
+      return res.status(400).json({ success: false, message: 'Invalid deposit amount.' });
+    }
 
     await client.query('BEGIN');
 
@@ -88,7 +112,7 @@ const deposit = async (req, res, next) => {
     }
 
     // Update balance
-    const newBalance = parseFloat(account.balance) + parseFloat(amount);
+    const newBalance = Number(account.balance) + normalizedAmount;
     await client.query(
       'UPDATE account SET balance = $1, updated_at = NOW() WHERE account_id = $2',
       [newBalance, account_id]
@@ -99,7 +123,7 @@ const deposit = async (req, res, next) => {
       `INSERT INTO transaction (account_id, amount, transaction_type, description, status)
        VALUES ($1, $2, 'Deposit', $3, 'Completed')
        RETURNING *`,
-      [account_id, amount, description || 'Deposit']
+      [account_id, normalizedAmount, description || 'Deposit']
     );
     const txn = txnResult.rows[0];
 
@@ -107,13 +131,13 @@ const deposit = async (req, res, next) => {
     await client.query(
       `INSERT INTO notification (user_type, user_id, title, message, type)
        VALUES ('Customer', $1, 'Deposit Successful', $2, 'success')`,
-      [account.customer_id, `₹${parseFloat(amount).toLocaleString()} has been deposited to account ${account.account_number}`]
+      [account.customer_id, `₹${normalizedAmount.toLocaleString()} has been deposited to account ${account.account_number}`]
     );
 
     await client.query('COMMIT');
 
     // Run fraud detection (non-blocking)
-    runFraudDetection(txn.transaction_id, account_id, amount, 'Deposit').catch(console.error);
+    runFraudDetection(txn.transaction_id, account_id, normalizedAmount, 'Deposit').catch(console.error);
 
     res.json({
       success: true,
@@ -137,6 +161,11 @@ const withdraw = async (req, res, next) => {
   try {
     const { account_id, amount, description } = req.body;
     const { id: userId, role } = req.user;
+    const normalizedAmount = parsePositiveAmount(amount);
+
+    if (!normalizedAmount) {
+      return res.status(400).json({ success: false, message: 'Invalid withdrawal amount.' });
+    }
 
     await client.query('BEGIN');
 
@@ -161,12 +190,12 @@ const withdraw = async (req, res, next) => {
       return res.status(400).json({ success: false, message: `Account is ${account.status}.` });
     }
 
-    if (parseFloat(account.balance) < parseFloat(amount)) {
+    if (Number(account.balance) < normalizedAmount) {
       await client.query('ROLLBACK');
       return res.status(400).json({ success: false, message: 'Insufficient balance.' });
     }
 
-    const newBalance = parseFloat(account.balance) - parseFloat(amount);
+    const newBalance = Number(account.balance) - normalizedAmount;
     await client.query(
       'UPDATE account SET balance = $1, updated_at = NOW() WHERE account_id = $2',
       [newBalance, account_id]
@@ -176,19 +205,19 @@ const withdraw = async (req, res, next) => {
       `INSERT INTO transaction (account_id, amount, transaction_type, description, status)
        VALUES ($1, $2, 'Withdrawal', $3, 'Completed')
        RETURNING *`,
-      [account_id, amount, description || 'Withdrawal']
+      [account_id, normalizedAmount, description || 'Withdrawal']
     );
     const txn = txnResult.rows[0];
 
     await client.query(
       `INSERT INTO notification (user_type, user_id, title, message, type)
        VALUES ('Customer', $1, 'Withdrawal Processed', $2, 'info')`,
-      [account.customer_id, `₹${parseFloat(amount).toLocaleString()} withdrawn from account ${account.account_number}`]
+      [account.customer_id, `₹${normalizedAmount.toLocaleString()} withdrawn from account ${account.account_number}`]
     );
 
     await client.query('COMMIT');
 
-    runFraudDetection(txn.transaction_id, account_id, amount, 'Withdrawal').catch(console.error);
+    runFraudDetection(txn.transaction_id, account_id, normalizedAmount, 'Withdrawal').catch(console.error);
 
     res.json({
       success: true,
@@ -212,6 +241,11 @@ const transfer = async (req, res, next) => {
   try {
     const { from_account_id, to_account_number, amount, transfer_mode, description } = req.body;
     const { id: userId, role } = req.user;
+    const normalizedAmount = parsePositiveAmount(amount);
+
+    if (!normalizedAmount) {
+      return res.status(400).json({ success: false, message: 'Invalid transfer amount.' });
+    }
 
     await client.query('BEGIN');
 
@@ -237,7 +271,7 @@ const transfer = async (req, res, next) => {
       return res.status(400).json({ success: false, message: `Source account is ${fromAccount.status}.` });
     }
 
-    if (parseFloat(fromAccount.balance) < parseFloat(amount)) {
+    if (Number(fromAccount.balance) < normalizedAmount) {
       await client.query('ROLLBACK');
       return res.status(400).json({ success: false, message: 'Insufficient balance.' });
     }
@@ -264,8 +298,8 @@ const transfer = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Cannot transfer to same account.' });
     }
 
-    const newFromBalance = parseFloat(fromAccount.balance) - parseFloat(amount);
-    const newToBalance   = parseFloat(toAccount.balance) + parseFloat(amount);
+    const newFromBalance = Number(fromAccount.balance) - normalizedAmount;
+    const newToBalance = Number(toAccount.balance) + normalizedAmount;
 
     // Update balances
     await client.query('UPDATE account SET balance = $1, updated_at = NOW() WHERE account_id = $2', [newFromBalance, fromAccount.account_id]);
@@ -275,21 +309,21 @@ const transfer = async (req, res, next) => {
     const debitTxn = await client.query(
       `INSERT INTO transaction (account_id, amount, transaction_type, description, status)
        VALUES ($1, $2, 'Transfer', $3, 'Completed') RETURNING *`,
-      [fromAccount.account_id, amount, description || `Transfer to ${to_account_number}`]
+      [fromAccount.account_id, normalizedAmount, description || `Transfer to ${to_account_number}`]
     );
 
     // Record credit transaction
     await client.query(
       `INSERT INTO transaction (account_id, amount, transaction_type, description, status)
        VALUES ($1, $2, 'Transfer', $3, 'Completed')`,
-      [toAccount.account_id, amount, `Transfer from ${fromAccount.account_number}`]
+      [toAccount.account_id, normalizedAmount, `Transfer from ${fromAccount.account_number}`]
     );
 
     // Transfer record
     await client.query(
       `INSERT INTO transfer (from_account_id, to_account_id, amount, transfer_mode, description, status)
        VALUES ($1, $2, $3, $4, $5, 'Completed')`,
-      [fromAccount.account_id, toAccount.account_id, amount, transfer_mode || 'NEFT', description || 'Fund transfer']
+      [fromAccount.account_id, toAccount.account_id, normalizedAmount, transfer_mode || 'NEFT', description || 'Fund transfer']
     );
 
     // Notifications
@@ -298,14 +332,14 @@ const transfer = async (req, res, next) => {
        VALUES ('Customer', $1, 'Transfer Sent', $2, 'info'),
               ('Customer', $3, 'Amount Received', $4, 'success')`,
       [
-        fromAccount.customer_id, `₹${parseFloat(amount).toLocaleString()} transferred to ${to_account_number}`,
-        toAccount.customer_id,   `₹${parseFloat(amount).toLocaleString()} received from ${fromAccount.account_number}`
+        fromAccount.customer_id, `₹${normalizedAmount.toLocaleString()} transferred to ${to_account_number}`,
+        toAccount.customer_id, `₹${normalizedAmount.toLocaleString()} received from ${fromAccount.account_number}`
       ]
     );
 
     await client.query('COMMIT');
 
-    runFraudDetection(debitTxn.rows[0].transaction_id, fromAccount.account_id, amount, 'Transfer').catch(console.error);
+    runFraudDetection(debitTxn.rows[0].transaction_id, fromAccount.account_id, normalizedAmount, 'Transfer').catch(console.error);
 
     res.json({
       success: true,
