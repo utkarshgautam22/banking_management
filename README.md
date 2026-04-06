@@ -16,9 +16,9 @@ A state-of-the-art, full-stack financial platform built with **Next.js 15**, **N
 ### 🛡️ Fraud Detection & Security
 - **Real-Time Analysis:** Automated risk assessment on every transaction.
 - **Rule-Based Engine:** Detects large transactions, high-frequency shifts, and velocity anomalies.
-- **Audit Logging:** Comprehensive tracking of all security-sensitive operations.
-- **RBAC:** Robust Role-Based Access Control enforcing strict isolation between portals.
-- **Session Isolation:** Per-tab session management allowing multiple accounts to be managed simultaneously.
+- **RBAC & Path Protection:** Robust Role-Based Access Control enforcing strict isolation between portals with automatic path-based redirection.
+- **Session Isolation:** Per-tab session management allowing multiple accounts to be managed independently.
+- **Initial Verification:** Instant background session validation on app mount to prevent unauthorized rendering.
 
 ---
 
@@ -27,7 +27,7 @@ A state-of-the-art, full-stack financial platform built with **Next.js 15**, **N
 - **Frontend:** Next.js 15 (App Router), Tailwind CSS, Lucide Icons, Recharts, Framer Motion.
 - **Backend:** Node.js, Express.js.
 - **Database:** PostgreSQL with `pg` pool management.
-- **Security:** JWT Authentication, Bcrypt password hashing, Helmet security headers, CORS protection.
+- **Security:** JWT Authentication (1h expiry), Bcrypt password hashing, Helmet security headers, CORS protection.
 
 ---
 
@@ -36,7 +36,7 @@ A state-of-the-art, full-stack financial platform built with **Next.js 15**, **N
 ### 1. Database Configuration
 Ensure **PostgreSQL** is running on your machine.
 1. Create a database named `banking_db`.
-2. run `backend/src/db/schema.sql` to initialize the tables.
+2. Run `backend/src/db/schema.sql` to initialize the tables.
 3. (Optional) Run `backend/src/db/seed.js` to populate with professional demo data.
 
 ### 2. Environment Variables
@@ -50,7 +50,6 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=banking_db
 JWT_SECRET=super_secure_secret_change_this_for_prod
-JWT_EXPIRES_IN=24h
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -97,6 +96,13 @@ cd backend && npm start
 | **Customer** | `john@example.com` | `Customer@123` |
 | **Employee** | `teller@bank.com` | `Teller@123` |
 | **Administrator** | `admin@bank.com` | `Admin@123` |
+
+---
+
+## 📜 Documentation
+- [Implementation Details](implementation.md)
+- [User Manual](USER_MANUAL.md)
+- [Testing Procedure](TESTING_PROCEDURE.md)
 
 ---
 
