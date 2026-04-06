@@ -325,6 +325,26 @@ Admin can:
 2. Review alert reason, transaction context, level, and timestamps.
 3. Resolve or dismiss active alerts.
 
+Implemented fraud rules (exact backend logic):
+
+1. Large transaction rule:
+	- if amount > 50,000 then alert is generated.
+	- severity is High when amount is between 50,001 and 100,000.
+	- severity is Critical when amount > 100,000.
+2. Rapid transaction velocity rule:
+	- if account has more than 5 transactions in last 60 minutes, alert is generated.
+	- severity is High for 6 to 10 transactions.
+	- severity is Critical for more than 10 transactions.
+3. Daily outflow concentration rule:
+	- for Withdrawal and Transfer transactions, if same-day total outflow > 100,000, alert is generated.
+	- severity is High.
+
+Post-alert actions:
+
+1. Alert status is created as Open.
+2. Admin notification is generated.
+3. Customer security warning notification is generated.
+
 ### 7.6 Reports and Analytics
 
 Path: /admin/reports
